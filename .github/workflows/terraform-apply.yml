@@ -1,0 +1,54 @@
+name: terraform-apply
+
+# Manual only — never triggers on push. Uses GitHub OIDC to assume an AWS IAM
+# role instead of long-lived access keys. The role comes from modules/gha-oidc
+# (apply bootstrap/ with enable_gha_oidc=true to create it — see
+# bootstrap/README.md); take its gha_apply_role_arn output and set it as the
+# TF_APPLY_ROLE_ARN repo/environment variable. Also create GitHub Environments
+# named "dev" and "prod" with required reviewers — the role's trust policy is
+# scoped to exactly those environment names (see modules/gha-oidc/README.md).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to apply (dev or prod)"
+        required: true
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: envs/${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.11.0"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TF_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+
+      # NOTE: backend.hcl and terraform.tfvars are gitignored on purpose (see
+      # root .gitignore) — in a real setup, generate/fetch them here (e.g. from
+      # SSM Parameter Store) before init. Left as a TODO for the implementation
+      # phase since no real backend exists yet.
+      - name: terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - name: terraform plan
+        run: terraform plan -var-file=terraform.tfvars -out=tfplan
+
+      - name: terraform apply
+        run: terraform apply tfplan

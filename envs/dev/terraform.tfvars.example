@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored) and adjust. No real values are committed here.
+aws_region       = "ap-northeast-1"
+project_name     = "reference"
+environment      = "dev"
+compute_platform = "ecs" # or "eks"
+container_image  = "public.ecr.aws/docker/library/nginx:stable"
+
+enable_cache          = false
+enable_queue          = false
+enable_custom_domain  = false
+domain_name           = "example.internal"

@@ -1,0 +1,66 @@
+name: terraform-ci
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "envs/**"
+      - "bootstrap/**"
+      - "examples/**"
+      - ".github/workflows/terraform-ci.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.11.0"
+
+      # Runs from the repo root so it covers modules/, envs/*, bootstrap/, and
+      # examples/ in one pass — per-directory matrix would miss modules/ since
+      # `-recursive` only walks a directory's own subtree, not siblings.
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Every root config, plus every implemented module validated directly
+        # (not just transitively through whichever root happens to call it —
+        # bootstrap/envs/* wiring could change later and silently drop
+        # coverage). Stub modules (main.tf still a commented sketch) have
+        # nothing to validate yet; add them here as each gets implemented.
+        working-directory:
+          - bootstrap
+          - envs/dev
+          - envs/prod
+          - modules/network
+          - modules/gha-oidc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.11.0"
+
+      - name: terraform init (no backend)
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform validate
+
+      # Plan is intentionally not run here: envs/dev and envs/prod have no
+      # real backend.hcl/terraform.tfvars in CI (gitignored on purpose), and
+      # module bodies are still TODO placeholders (v0.1 skeleton). Add a plan
+      # job once modules/* main.tf blocks are implemented and CI has a way to
+      # supply real backend/tfvars values (e.g. from repo/environment vars).
