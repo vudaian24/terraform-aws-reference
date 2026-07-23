@@ -6,15 +6,18 @@ Built as thin wrappers around modules from
 [terraform-aws-modules](https://github.com/terraform-aws-modules) — this repo does not
 reimplement what upstream already provides.
 
-> **Status: v0.1, in progress.** Directory structure, module contracts, and CI
-> scaffolding are in place repo-wide. `modules/network` and `modules/gha-oidc`
-> (+ `bootstrap/`) are implemented; `envs/dev`/`envs/prod` wire `network` for
-> real (an end-to-end "smoke path" — data-sourced AZs, real outputs). Every
-> other app-stack module (`static-site`, `database`, `cache`, `queue`, `alb`,
-> `ecs-service`, `eks-cluster`, `acm-dns`) is still a commented-out TODO
-> sketch. Nothing here has been `apply`-ed against real AWS. Do not point this
-> at a real account until you've reviewed every module and env for your own
-> use case.
+> **Status: v0.1, all modules implemented.** Every module (`network`,
+> `gha-oidc`, `database`, `cache`, `queue`, `static-site`, `acm-dns`, `alb`,
+> `ecs-service`, `eks-cluster`) plus `bootstrap/` is implemented and wired for
+> real in both `envs/dev` and `envs/prod` — no commented-out sketches remain.
+> All 10 modules validate directly in CI (`terraform init -backend=false` +
+> `terraform validate`), and `envs/dev`/`envs/prod` validate the full wiring
+> together. Nothing here has been `apply`-ed against real AWS — that's the
+> one thing v0.1 deliberately stops short of. Do not point this at a real
+> account until you've reviewed every module and env for your own use case;
+> in particular note the ALB/CloudFront ACM cert caveat in `docs/NOTES.md`
+> (only CloudFront's cert is wired up — the ALB has no HTTPS cert wired by
+> default, since it would need a second, regionally-matched one).
 
 ## Why this repo exists
 
@@ -24,14 +27,11 @@ registry. Not tied to any one product's domain logic.
 
 ## How to reuse this in another project
 
-> Don't pin a `ref=` for a module whose `main.tf` is still a commented-out
-> TODO sketch — check that module's own README for its Status line first. As
-> of v0.1 that's still `static-site`, `database`, `cache`, `queue`, `alb`,
-> `ecs-service`, `eks-cluster`, `acm-dns`; `network` and `gha-oidc` are
-> implemented. A git ref to a contract-only stub resolves and `init`s fine but
-> creates zero resources, which is a confusing failure mode. Wait for a
-> module's README to say "implemented" before pinning it into another
-> project.
+> As of v0.1, every module's README says "Status: implemented" — safe to pin
+> a `ref=` against any of them. Still worth reading each module's own README
+> before reuse: several document real tradeoffs made for this reference repo
+> specifically (e.g. RDS over Aurora, PowerUserAccess-based OIDC role, no ALB
+> HTTPS cert wired by default) that a real project may want to revisit.
 
 **Option A — pin by git ref (recommended for staying in sync with fixes):**
 
@@ -72,12 +72,17 @@ See each directory's own `README.md` for details.
 | `alb`              | `alb/aws`                                           | `~> 10.0` |
 | `ecs-service`      | `ecs/aws` (+ `ecs/aws//modules/service`)             | `~> 7.5` |
 | `eks-cluster`      | `eks/aws`                                           | `~> 21.0` |
-| `acm-dns`          | `acm/aws` + `route53/aws`                           | `~> 6.0` / `~> 6.0` |
+| `acm-dns`          | `acm/aws` only — see note below                     | `~> 6.0` |
 | `gha-oidc`         | *(none — no upstream module for this exists)*       | n/a |
 
 Versions above were the latest stable tags as of 2026-07-23. Bump deliberately —
 don't float on `latest`. `gha-oidc` is hand-rolled IAM/OIDC resources, wired in
 via `bootstrap/` rather than `envs/*` — see `modules/gha-oidc/README.md`.
+`acm-dns` was originally scoped to also wrap `route53/aws`, but that module
+turned out to have no way to attach records to an already-known zone ID (its
+`create_zone = false` path re-looks-up the zone by name) — dropped in favor of
+letting `acm/aws` create its own DNS validation records directly against the
+`route53_zone_id` this repo already has. See `modules/acm-dns/README.md`.
 
 ## Prerequisites
 
@@ -91,11 +96,12 @@ via `bootstrap/` rather than `envs/*` — see `modules/gha-oidc/README.md`.
 
 ## Compute: ECS Fargate vs EKS
 
-Both are scaffolded (`modules/ecs-service`, `modules/eks-cluster`) since the stack
-they'll be reused for isn't fixed yet. Pick one per project — wiring both into the
-same `envs/<env>` stack simultaneously is not the intended usage.
+Both are implemented (`modules/ecs-service`, `modules/eks-cluster`) since the stack
+they'll be reused for isn't fixed yet. `envs/<env>` picks one via `var.compute_platform`
+("ecs" or "eks") — wiring both into the same env stack simultaneously is not the
+intended usage.
 
-## Getting started (once modules are implemented)
+## Getting started
 
 1. Run `bootstrap/` once to create the remote state bucket (see `bootstrap/README.md`).
 2. Copy `envs/dev/terraform.tfvars.example` → `terraform.tfvars` and

@@ -101,3 +101,88 @@ wiring changes later.
 
 Pinned to latest stable tag per module as of 2026-07-23 (checked via GitHub
 Releases API, not guessed). See root `README.md` table. Bump deliberately.
+
+## Remaining 8 modules implemented — real upstream schemas verified, not guessed
+
+`database`, `cache`, `queue`, `static-site`, `acm-dns`, `alb`, `ecs-service`,
+`eks-cluster` were all originally sketched as commented-out TODOs with
+best-guess upstream variable/output names. Before uncommenting any of them,
+fetched each pinned upstream module's real `variables.tf`/`outputs.tf` from
+GitHub at the exact pinned tag (same empirical-verification approach used for
+`modules/network`) rather than trusting the sketch. That surfaced several real
+bugs the sketch would have hard-failed on at `terraform validate`/`plan`
+time:
+
+- **`security-group/aws` `~> 6.0` is a complete rewrite, not a rename.** The
+  v4/v5 `ingress_with_source_security_group_id` (list of maps) API is gone
+  entirely — v6 replaces it with `ingress_rules`/`egress_rules`
+  (`map(object)`, keyed by rule name, with `protocol` → `ip_protocol` and
+  `source_security_group_id` → `referenced_security_group_id`). Also renamed
+  output `security_group_id` → `id`. Affects `modules/database` and
+  `modules/cache`, both of which create their own security group this way.
+- **`cloudfront/aws` doesn't manage the origin S3 bucket's policy.** Setting
+  up `origin_access_control` only configures the CloudFront side of OAC —
+  confirmed via the module's real `main.tf` (no `aws_s3_bucket_policy`
+  resource exists in it, no reference to `cloudfront.amazonaws.com`
+  anywhere). Without an explicit bucket policy granting
+  `cloudfront.amazonaws.com` `s3:GetObject` conditioned on
+  `AWS:SourceArn = <distribution arn>`, the bucket stays unreadable by
+  CloudFront (403s). Added that policy explicitly in `modules/static-site`.
+- **`acm/aws`'s `wait_for_validation` silently no-ops without
+  `validation_method = "DNS"`.** The module only creates the Route53
+  validation record and the `aws_acm_certificate_validation` resource when
+  `validation_method != null` — the original sketch left it unset, which
+  means `zone_id`/`wait_for_validation` would have been dead code. Added
+  `validation_method = "DNS"` explicitly in `modules/acm-dns`.
+- **`route53/aws` has no "attach to an existing zone ID" path.** Its
+  `create_zone = false` mode re-derives a zone ID via a
+  `data "aws_route53_zone"` lookup **by name**, not by an ID you already
+  have. Since this repo already threads `route53_zone_id` through as an
+  existing/looked-up value, adopting this module would just add a redundant
+  second lookup. Dropped it — `acm/aws` creates its own validation records
+  internally, no separate Route53 module needed. Root README's version table
+  updated to stop listing `route53/aws` as an `acm-dns` dependency.
+- **`ecs/aws//modules/service`'s `security_group_rules` doesn't exist.**
+  Real v7.5 API splits it into `security_group_ingress_rules`/
+  `security_group_egress_rules` (mirroring the `security-group` module's own
+  v6 rewrite above), with `ip_protocol`/`referenced_security_group_id`
+  instead of `protocol`/`source_security_group_id`. Also:
+  `container_definitions` mixes camelCase ECS-API field names
+  (`portMappings`, `containerPort`, `readonlyRootFilesystem`) with a
+  snake_case module-added field (`enable_cloudwatch_logging`) — the sketch
+  had guessed snake_case throughout. Root cluster module output is
+  `cluster_arn`, not `arn`.
+- **ALB `listeners` HTTP/HTTPS branching can't be a plain ternary between
+  differently-shaped object literals.** Terraform rejects a conditional
+  expression whose two branches are objects with different attribute keys
+  ("Inconsistent conditional result types") — confirmed by a real
+  `terraform validate` failure. Fixed by keeping one always-present `http`
+  entry whose `forward`/`redirect` sub-attributes are null on whichever
+  branch doesn't apply (null unifies fine against a single attribute's
+  type), plus a separately-nullable `https` entry, filtered with
+  `for ... if v != null` before handing the map to the module.
+- **`eks/aws` v21 needed a `node_security_group_id` output added** (wasn't
+  in the original stub's output list) so the EKS compute path has the same
+  "security group to allow DB/cache ingress from" capability that
+  `modules/ecs-service`'s `task_security_group_id` gives the ECS path.
+
+All 10 modules (8 above + previously-implemented `network`/`gha-oidc`) now
+validate directly in CI, and `envs/dev`/`envs/prod` validate the full wiring
+together (both `compute_platform` branches, and `enable_cache`/`enable_queue`/
+`enable_custom_domain` all set, exercised via `terraform validate` and a
+`terraform plan` dry-run that got as far as the expected backend/credential
+error, not a type error).
+
+## ALB doesn't get the acm-dns cert — region mismatch, not an oversight
+
+`modules/acm-dns`'s certificate is issued in us-east-1 (CloudFront's hard
+requirement for aliases). An ALB listener needs a certificate in its *own*
+region (ap-northeast-1 here) — the ALB API rejects a us-east-1 cert outright.
+So `envs/*` wires the acm-dns cert only to `modules/static-site`
+(CloudFront) and leaves the ALB's `certificate_arn` at `null` (HTTP-only,
+per `modules/alb`'s existing null-cert fallback). A real project wanting
+HTTPS on this ALB with a custom domain needs a second, regionally-matched
+ACM certificate — out of scope for this reference's single acm-dns
+instantiation; adding a second one (or a combined CloudFront-in-front-of-ALB
+architecture that only needs the one us-east-1 cert) is a real option but a
+genuine scope expansion, not a gap in what was asked for here.

@@ -14,6 +14,11 @@ variable "route53_zone_id" {
   description = "Existing Route53 hosted zone ID. No default — must be supplied by the consuming project."
   type        = string
   default     = null
+
+  validation {
+    condition     = !var.enable_custom_domain || var.route53_zone_id != null
+    error_message = "route53_zone_id is required when enable_custom_domain = true — the ACM module needs it to create DNS validation records."
+  }
 }
 
 variable "subject_alternative_names" {

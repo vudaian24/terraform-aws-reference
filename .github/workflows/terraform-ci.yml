@@ -36,14 +36,22 @@ jobs:
         # Every root config, plus every implemented module validated directly
         # (not just transitively through whichever root happens to call it —
         # bootstrap/envs/* wiring could change later and silently drop
-        # coverage). Stub modules (main.tf still a commented sketch) have
-        # nothing to validate yet; add them here as each gets implemented.
+        # coverage). All 10 modules are implemented as of v0.1 — nothing left
+        # to add here.
         working-directory:
           - bootstrap
           - envs/dev
           - envs/prod
           - modules/network
           - modules/gha-oidc
+          - modules/database
+          - modules/cache
+          - modules/queue
+          - modules/static-site
+          - modules/acm-dns
+          - modules/alb
+          - modules/ecs-service
+          - modules/eks-cluster
     steps:
       - uses: actions/checkout@v4
 
@@ -61,6 +69,8 @@ jobs:
 
       # Plan is intentionally not run here: envs/dev and envs/prod have no
       # real backend.hcl/terraform.tfvars in CI (gitignored on purpose), and
-      # module bodies are still TODO placeholders (v0.1 skeleton). Add a plan
-      # job once modules/* main.tf blocks are implemented and CI has a way to
-      # supply real backend/tfvars values (e.g. from repo/environment vars).
+      # `terraform init -backend=false` can't be followed by a real plan
+      # against an env that declares an actual S3 backend (Terraform correctly
+      # refuses — "Backend initialization required"). Add a plan job once CI
+      # has a way to supply real backend/tfvars values (e.g. from repo/
+      # environment vars) — validate is as far as this can go without that.

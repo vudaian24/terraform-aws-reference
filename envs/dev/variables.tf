@@ -69,6 +69,12 @@ variable "domain_name" {
   default     = "example.internal"
 }
 
+variable "route53_zone_id" {
+  description = "Existing Route53 hosted zone ID for domain_name. Required when enable_custom_domain = true (modules/acm-dns enforces this itself via a variable validation)."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Common tags applied to all resources in this environment."
   type        = map(string)

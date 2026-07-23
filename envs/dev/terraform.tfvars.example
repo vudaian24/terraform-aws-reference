@@ -9,3 +9,4 @@ enable_cache          = false
 enable_queue          = false
 enable_custom_domain  = false
 domain_name           = "example.internal"
+# route53_zone_id     = "Z0000000000000EXAMPLE" # required only when enable_custom_domain = true

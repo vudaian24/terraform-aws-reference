@@ -4,9 +4,8 @@ Wraps [`terraform-aws-modules/elasticache/aws`](https://github.com/terraform-aws
 (`~> 1.11`). Redis replication group, in-transit + at-rest encryption on by
 default.
 
-**Status:** skeleton — contract defined, upstream module call not yet wired.
-Optional component: only instantiate from `envs/<env>` if the project actually
-needs a cache.
+**Status: implemented.** Optional component: only instantiate from `envs/<env>`
+if the project actually needs a cache.
 
 ## Intended inputs (contract)
 

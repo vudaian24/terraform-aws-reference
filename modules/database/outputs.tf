@@ -1,4 +1,7 @@
-# TODO(implementation phase): expose once modules above are wired in.
-#
-# output "db_instance_endpoint"               { value = module.db.db_instance_endpoint }
-# output "db_instance_master_user_secret_arn" { value = module.db.db_instance_master_user_secret_arn }
+output "db_instance_endpoint" {
+  value = module.db.db_instance_endpoint
+}
+
+output "db_instance_master_user_secret_arn" {
+  value = module.db.db_instance_master_user_secret_arn
+}

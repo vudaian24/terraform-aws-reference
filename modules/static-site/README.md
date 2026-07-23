@@ -5,7 +5,12 @@ Wraps [`terraform-aws-modules/s3-bucket/aws`](https://github.com/terraform-aws-m
 (`~> 6.0`). Private S3 bucket as CloudFront origin via Origin Access Control (OAC,
 not the legacy OAI), SPA-friendly error responses (403/404 → `index.html`).
 
-**Status:** skeleton — contract defined, upstream module calls not yet wired.
+**Status: implemented.** Includes an explicit `aws_s3_bucket_policy` granting
+`cloudfront.amazonaws.com` read access scoped to this distribution's ARN — the
+`cloudfront/aws` module configures OAC signing on the distribution side only,
+it does not manage the origin bucket's resource policy, so without this the
+bucket stays unreadable by CloudFront (confirmed against the module's v6.7.0
+source: no `aws_s3_bucket_policy` resource exists in it).
 
 ## Intended inputs (contract)
 

@@ -14,8 +14,22 @@ output "database_subnet_ids" {
   value = module.network.database_subnet_ids
 }
 
-# TODO(implementation phase): expose once the remaining modules are wired in main.tf.
-#
-# output "alb_dns_name"          { value = module.alb.alb_dns_name }
-# output "cloudfront_domain_name" { value = module.static_site.distribution_domain_name }
-# output "db_endpoint"           { value = module.database.db_instance_endpoint }
+output "alb_dns_name" {
+  value = module.alb.alb_dns_name
+}
+
+output "cloudfront_domain_name" {
+  value = module.static_site.distribution_domain_name
+}
+
+output "db_instance_endpoint" {
+  value = module.database.db_instance_endpoint
+}
+
+output "queue_url" {
+  value = var.enable_queue ? module.queue[0].queue_url : null
+}
+
+output "cache_primary_endpoint_address" {
+  value = var.enable_cache ? module.cache[0].primary_endpoint_address : null
+}

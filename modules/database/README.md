@@ -4,7 +4,7 @@ Wraps [`terraform-aws-modules/rds/aws`](https://github.com/terraform-aws-modules
 (`~> 7.0`). PostgreSQL by default. Master password managed by AWS Secrets Manager
 (`manage_master_user_password`) — never a plaintext variable.
 
-**Status:** skeleton — contract defined, upstream module call not yet wired.
+**Status: implemented.**
 
 ## Why RDS instance, not Aurora
 
