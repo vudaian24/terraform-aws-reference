@@ -107,8 +107,8 @@ intended usage.
 2. Copy `envs/dev/terraform.tfvars.example` → `terraform.tfvars` and
    `envs/dev/backend.hcl.example` → `backend.hcl`, fill in real values (never commit
    the real files — `.gitignore` already excludes them).
-3. `cd envs/dev && terraform init -backend-config=backend.hcl`
-4. `terraform plan`
+3. `cd envs/dev && terraform init -backend-config=backend.hcl`.
+4. `terraform plan`.
 
 ## Security notes
 
